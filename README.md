@@ -144,22 +144,38 @@ export AZURE_TENANT_ID=<your-tenant-guid>
 export AZURE_SUBSCRIPTION_ID=<your-personal-sub-guid>
 export AZKV_TEST_RECORD_VAULT=<your-personal-vault-name>
 
-# 2. Record. The conftest scrubbers run on each request/response as it's
+# 2. Opt in to recording. This both bypasses the "missing cassette"
+#    skip and flips the vcr_config record_mode from "none" to "once".
+export AZKV_RECORDING=1
+
+# 3. (Optional but recommended for MSA-rooted subscriptions.) Pin token
+#    acquisition to a specific tenant. Some vaults — notably those in
+#    Azure Free subscriptions whose root identity is an MSA — emit a
+#    WWW-Authenticate challenge that names a tenant the principal does
+#    not belong to. The test fixture's _PinnedTenantCliCredential calls
+#    `az account get-access-token --tenant <pinned>` directly and ignores
+#    the bogus challenge tenant.
+export AZKV_AUTH_TENANT_ID=<your-tenant-guid>
+
+# 4. Record. The conftest scrubbers run on each request/response as it's
 #    written to disk.
 pytest --record-mode=once tests/test_keyvault_vcr.py
 
-# 3. **Eyeball every cassette before committing.** Confirm:
+# 5. **Eyeball every cassette before committing.** Confirm:
 #    - Every Authorization header reads "REDACTED"
-#    - Every "value" / "access_token" / "refresh_token" body field reads "REDACTED"
-#    - No GUID other than 00000000-0000-0000-0000-000000000000 appears
+#    - Every secret-fetch "value" body field reads "REDACTED" (paged list
+#      responses keep `"value": [...]` because that wrapper isn't a secret)
+#    - No real GUID appears (only 00000000-0000-0000-0000-000000000000)
 #    - The vault hostname is "test-vault.vault.azure.net" everywhere
-grep -i 'bearer\|access_token\|"value"' tests/cassettes/**/*.yaml | head
+#    - No JWT-looking token bodies (search for `Bearer eyJ`)
+grep -iE 'bearer [a-z0-9]|access_token|naeemhossain|<your-tenant>|<your-vault>' \
+    tests/cassettes/**/*.yaml
 
-# 4. If all looks clean, commit. CI will replay them with record_mode=none.
+# 6. If all looks clean, commit. CI will replay them with record_mode=none.
 git add tests/cassettes/ && git commit
 ```
 
-The scrubbers are defense-in-depth; the human eyeball at step 3 is the actual
+The scrubbers are defense-in-depth; the human eyeball at step 5 is the actual
 safety mechanism.
 
 ## License
