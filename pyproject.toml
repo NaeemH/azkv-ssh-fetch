@@ -78,6 +78,13 @@ select = [
 ]
 ignore = ["E501"] # handled by formatter
 
+[tool.ruff.lint.per-file-ignores]
+# Pytest fixtures appear as "unused" parameters because their side effects
+# (monkeypatching, mocking) are what's wanted, not their return value. Same
+# for stub functions that must match a third-party signature (e.g., the
+# `check` arg of subprocess.run).
+"tests/**" = ["ARG001"]
+
 [tool.ruff.format]
 quote-style = "double"
 
