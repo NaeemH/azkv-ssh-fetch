@@ -3,6 +3,7 @@
 [![CI](https://github.com/NaeemH/azkv-ssh-fetch/actions/workflows/ci.yml/badge.svg)](https://github.com/NaeemH/azkv-ssh-fetch/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/azkv-ssh-fetch.svg)](https://pypi.org/project/azkv-ssh-fetch/)
 [![Python](https://img.shields.io/pypi/pyversions/azkv-ssh-fetch.svg)](https://pypi.org/project/azkv-ssh-fetch/)
+[![Downloads](https://img.shields.io/pypi/dm/azkv-ssh-fetch.svg)](https://pypistats.org/packages/azkv-ssh-fetch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Fetch SSH private keys from **Azure Key Vault** and connect to VMs / VMSS instances through **Azure Bastion** — in one command.
