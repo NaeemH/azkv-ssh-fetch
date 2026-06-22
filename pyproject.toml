@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "azkv-ssh-fetch"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fetch SSH private keys from Azure Key Vault and connect to VMs/VMSS via Bastion."
 readme = "README.md"
 requires-python = ">=3.10"
