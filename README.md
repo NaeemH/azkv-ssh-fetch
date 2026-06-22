@@ -115,6 +115,53 @@ ruff check . && ruff format --check .
 mypy src
 ```
 
+### Test layers
+
+| Layer | What it covers | Where |
+|---|---|---|
+| Unit | SDK calls mocked at the boundary (`tests/test_keyvault.py`, `tests/test_ssh.py`, `tests/test_cli.py`) | Every CI run, no network |
+| VCR replay | Real `azure-keyvault-secrets` + `azure-identity` code paths replayed from recorded cassettes (`tests/test_keyvault_vcr.py`) | Every CI run, no network — cassettes live in `tests/cassettes/` |
+| Smoke | Manual `akf list` / `akf fetch` against a personal vault | Pre-tag, by you |
+
+VCR-marked tests **auto-skip** when their cassette is missing (so a fresh
+checkout's CI stays green with zero credentials).
+
+### Recording cassettes
+
+VCR cassettes are the trust boundary between live Key Vault data and the
+public git history. The scrubber in `tests/conftest.py` redacts every
+`Authorization` header, every `access_token` / `refresh_token` / `id_token`
+body field, every secret `value` field, every GUID (replaced with the all-zero
+GUID), and the vault hostname (replaced with `test-vault`). **Do not record
+against a Microsoft-internal tenant (PME/TME) or any customer subscription** —
+use a personal/MSDN/PAYG sub with a vault dedicated to this purpose.
+
+```bash
+# 1. Create a personal vault and a test secret named "akf-test-key"
+#    (any string value -- the scrubber redacts it before commit).
+az login
+export AZURE_TENANT_ID=<your-tenant-guid>
+export AZURE_SUBSCRIPTION_ID=<your-personal-sub-guid>
+export AZKV_TEST_RECORD_VAULT=<your-personal-vault-name>
+
+# 2. Record. The conftest scrubbers run on each request/response as it's
+#    written to disk.
+pytest --record-mode=once tests/test_keyvault_vcr.py
+
+# 3. **Eyeball every cassette before committing.** Confirm:
+#    - Every Authorization header reads "REDACTED"
+#    - Every "value" / "access_token" / "refresh_token" body field reads "REDACTED"
+#    - No GUID other than 00000000-0000-0000-0000-000000000000 appears
+#    - The vault hostname is "test-vault.vault.azure.net" everywhere
+grep -i 'bearer\|access_token\|"value"' tests/cassettes/**/*.yaml | head
+
+# 4. If all looks clean, commit. CI will replay them with record_mode=none.
+git add tests/cassettes/ && git commit
+```
+
+The scrubbers are defense-in-depth; the human eyeball at step 3 is the actual
+safety mechanism.
+
 ## License
 
 [MIT](LICENSE) © 2026 Naeem Hossain
