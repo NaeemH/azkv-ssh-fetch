@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Keep the workflow Actions current. The last bump was done by hand in
+  # 2026-06, and by 2026-08 checkout/setup-python/upload-artifact had all
+  # drifted a major behind and download-artifact two majors behind - inside
+  # the release job that publishes to PyPI.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+
+  # Track the Python dependency set so runtime and dev pins do not rot
+  # silently between releases.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
