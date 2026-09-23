@@ -42,3 +42,56 @@ jobs:
 
       - name: Test (pytest)
         run: pytest -q
+
+  # release.yml publishes to PyPI and only ever runs on a v* tag, so the
+  # actions unique to it - upload-artifact, download-artifact - are never
+  # exercised by a pull request. A Dependabot bump to either therefore arrives
+  # with a green tick that describes the test matrix above, which does not
+  # reference them. The bump is reviewed against evidence about unrelated code.
+  #
+  # This job round-trips a real build through the same two actions at the same
+  # major versions release.yml pins, so a breaking change in either fails here
+  # rather than at 2am during a release.
+  #
+  # It deliberately stops at building and re-downloading. Publishing stays
+  # bound to the tag-triggered workflow, and Trusted Publishing must not be
+  # reachable from a pull request.
+  build:
+    name: Build distribution (exercises the release path)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Check metadata
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist-ci
+          path: dist/
+
+      - name: Clear the local copy
+        run: rm -rf dist
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: dist-ci
+          path: dist/
+
+      - name: Assert the round trip produced both artifacts
+        run: |
+          set -euo pipefail
+          ls -l dist/
+          test -n "$(find dist -name '*.whl' -print -quit)" || { echo "::error::no wheel after download"; exit 1; }
+          test -n "$(find dist -name '*.tar.gz' -print -quit)" || { echo "::error::no sdist after download"; exit 1; }
+          echo "Round trip OK."
