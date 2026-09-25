@@ -1,15 +1,27 @@
 version: 2
 updates:
-  # Keep the workflow Actions current. The last bump was done by hand in
-  # 2026-06, and by 2026-08 checkout/setup-python/upload-artifact had all
-  # drifted a major behind and download-artifact two majors behind - inside
-  # the release job that publishes to PyPI.
+  # Keep the workflow Actions current. One PR per action produced 16 open PRs
+  # across four repos in a single week, which is not reviewable as a batch, so
+  # updates are grouped per ecosystem. Majors are split out because they are
+  # the ones that actually need reading.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "ci"
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      actions-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
 
   # Track the Python dependency set so runtime and dev pins do not rot
   # silently between releases.
@@ -19,3 +31,15 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    groups:
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      python-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
