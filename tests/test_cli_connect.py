@@ -12,6 +12,7 @@ No real Azure or `az` CLI is touched.
 
 from __future__ import annotations
 
+import os
 import stat
 import subprocess
 from pathlib import Path
@@ -128,7 +129,8 @@ def test_connect_builds_correct_argv_and_writes_key_0600_then_shreds(
     assert key_path == fake_ssh_dir / "akf-web-01-key"
     assert observed["key_existed"] is True
     # CRITICAL: mode 0600 BEFORE Bastion ever sees the file
-    assert observed["key_mode"] == 0o600
+    if os.name == "posix":
+        assert observed["key_mode"] == 0o600
     # Content present (trailing newline added by write_private_key)
     assert FAKE_KEY in observed["key_contents"]
 
@@ -208,7 +210,8 @@ def test_connect_keep_key_leaves_file_on_disk(
 
     persisted = fake_ssh_dir / "akf-persist-key"
     assert persisted.exists()
-    assert stat.S_IMODE(persisted.stat().st_mode) == 0o600
+    if os.name == "posix":
+        assert stat.S_IMODE(persisted.stat().st_mode) == 0o600
     assert "shredded" not in result.stdout
 
 

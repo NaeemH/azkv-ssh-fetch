@@ -73,9 +73,13 @@ def test_fetch_writes_to_output(tmp_path: Path, mocker: MockerFixture) -> None:
     result = runner.invoke(app, ["fetch", "--vault", "kv-test", "my-secret", "--output", str(out)])
     assert result.exit_code == 0, result.stdout
     assert out.exists()
+    import os
     import stat
 
-    assert stat.S_IMODE(out.stat().st_mode) == 0o600
+    # Windows st_mode only reflects the read-only flag, not the ACL, so the
+    # 0600 assertion is meaningless there.
+    if os.name == "posix":
+        assert stat.S_IMODE(out.stat().st_mode) == 0o600
 
 
 def test_fetch_missing_secret_exits_2(tmp_path: Path, mocker: MockerFixture) -> None:

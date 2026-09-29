@@ -58,9 +58,19 @@ def write_private_key(key_material: str, destination: Path) -> Path:
     )
     tmp_path = Path(tmp_path_str)
     try:
-        os.fchmod(fd, KEY_MODE)
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        # mkstemp already created this 0600, so the key material is never
+        # written through a wider mode. os.fchmod would be redundant here and
+        # does not exist on Windows at all, so chmod by path instead - it is
+        # portable, and it must happen only after fdopen has closed the
+        # descriptor, because Windows refuses to touch an open file.
+        #
+        # newline="" disables text-mode newline translation. Without it Windows
+        # rewrites every \n to \r\n, and OpenSSH rejects a private key with CRLF
+        # line endings - the key would be written "successfully" and then fail at
+        # connect time with an opaque libcrypto error.
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
             fh.write(payload)
+        os.chmod(tmp_path, KEY_MODE)
         os.replace(tmp_path, dest)
     except OSError as exc:
         tmp_path.unlink(missing_ok=True)
@@ -73,6 +83,12 @@ def write_private_key(key_material: str, destination: Path) -> Path:
 
 def assert_safe_mode(path: Path) -> None:
     """Raise if `path` is group/world readable (OpenSSH will reject)."""
+    if os.name != "posix":
+        # Windows has no POSIX mode bits. os.stat reports a synthetic st_mode
+        # with the group/other bits always set, so this check would reject
+        # every key regardless of its real ACL. OpenSSH on Windows enforces
+        # ACLs itself, so defer to it rather than fail on a fabricated mode.
+        return
     st = path.stat()
     if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
         raise SshKeyWriteError(f"{path} is group/world accessible; chmod 600 required")

@@ -13,7 +13,15 @@ from azkv_ssh_fetch.ssh import assert_safe_mode, write_private_key
 
 SAMPLE_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake-base64-payload-here\n-----END OPENSSH PRIVATE KEY-----"
 
+# Windows reports a synthetic st_mode (0o666 / 0o444) that reflects only the
+# read-only flag, not the ACL that actually governs access, so POSIX mode
+# assertions cannot hold there and say nothing useful when they do.
+posix_only = pytest.mark.skipif(
+    os.name != "posix", reason="POSIX mode bits are not meaningful on this platform"
+)
 
+
+@posix_only
 def test_write_private_key_sets_mode_0600(tmp_path: Path) -> None:
     dest = tmp_path / "ssh" / "id_test"
     written = write_private_key(SAMPLE_KEY, dest)
@@ -27,6 +35,20 @@ def test_write_private_key_appends_trailing_newline(tmp_path: Path) -> None:
     dest = tmp_path / "id_test"
     write_private_key(SAMPLE_KEY, dest)
     assert dest.read_text(encoding="utf-8").endswith("\n")
+
+
+def test_write_private_key_never_writes_crlf(tmp_path: Path) -> None:
+    """OpenSSH rejects a private key with CRLF line endings.
+
+    Read as BYTES on purpose. read_text() translates CRLF back to LF, so the
+    text-mode assertions above pass even when the file on disk is unusable -
+    which is exactly what Windows produced before newline="" was set.
+    """
+    dest = tmp_path / "id_test"
+    write_private_key(SAMPLE_KEY, dest)
+    raw = dest.read_bytes()
+    assert b"\r\n" not in raw, "CRLF in a private key; OpenSSH will reject it"
+    assert b"\r" not in raw
 
 
 def test_write_private_key_preserves_existing_newline(tmp_path: Path) -> None:
@@ -53,8 +75,9 @@ def test_write_private_key_creates_missing_parent(tmp_path: Path) -> None:
     write_private_key(SAMPLE_KEY, dest)
     assert dest.exists()
     # Parent should be 0700
-    parent_mode = stat.S_IMODE(dest.parent.stat().st_mode)
-    assert parent_mode == 0o700
+    if os.name == "posix":
+        parent_mode = stat.S_IMODE(dest.parent.stat().st_mode)
+        assert parent_mode == 0o700
 
 
 def test_write_private_key_empty_raises(tmp_path: Path) -> None:
@@ -69,6 +92,7 @@ def test_assert_safe_mode_passes_for_0600(tmp_path: Path) -> None:
     assert_safe_mode(p)  # no exception
 
 
+@posix_only
 def test_assert_safe_mode_rejects_world_readable(tmp_path: Path) -> None:
     p = tmp_path / "key"
     p.write_text("x", encoding="utf-8")
