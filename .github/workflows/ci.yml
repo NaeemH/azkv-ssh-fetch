@@ -18,6 +18,16 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          # This is a CLI people install on their own machine, so Windows is a
+          # real target. `os.fchmod` does not exist there, so `write_private_key` - the function this tool exists to perform - raised `AttributeError` on every Windows machine.
+          # None of it was visible here, because every job ran on Linux.
+          #
+          # One Windows job on the current stable Python guards the regression
+          # without doubling the matrix - the POSIX-specific behaviour is already
+          # covered by the four Linux jobs.
+          - os: windows-latest
+            python-version: "3.13"
     steps:
       - uses: actions/checkout@v6
 
